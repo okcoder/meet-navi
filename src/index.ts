@@ -10,6 +10,44 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+const GOOGLE_ACCOUNT_URL = 'https://myaccount.google.com/';
+
+const EMAIL_EXTRACTION_SCRIPT = `(() => {
+  const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+  const pickEmail = (value) => {
+    if (!value) return null;
+    const matched = String(value).match(emailPattern);
+    return matched ? matched[0] : null;
+  };
+
+  const selectors = [
+    'a[href*="SignOutOptions"]',
+    '[data-email]',
+    '[aria-label*="@"]',
+    '[title*="@"]',
+  ];
+
+  for (const selector of selectors) {
+    const nodes = document.querySelectorAll(selector);
+    for (const node of nodes) {
+      const candidates = [
+        node.getAttribute('data-email'),
+        node.getAttribute('email'),
+        node.getAttribute('aria-label'),
+        node.getAttribute('title'),
+        node.textContent,
+      ];
+
+      for (const candidate of candidates) {
+        const email = pickEmail(candidate);
+        if (email) return email;
+      }
+    }
+  }
+
+  return pickEmail(document.body?.innerText ?? '');
+})()`;
+
 const createWindow = (): void => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -21,7 +59,43 @@ const createWindow = (): void => {
   });
 
   // and load the requested page.
-  mainWindow.loadURL('https://myaccount.google.com/');
+  mainWindow.loadURL(GOOGLE_ACCOUNT_URL);
+
+  let lastLoggedEmail: string | null = null;
+
+  const logGoogleEmail = async (): Promise<boolean> => {
+    if (!mainWindow.webContents.getURL().startsWith(GOOGLE_ACCOUNT_URL)) {
+      return false;
+    }
+
+    try {
+      const email = (await mainWindow.webContents.executeJavaScript(EMAIL_EXTRACTION_SCRIPT, true)) as string | null;
+      if (!email || email === lastLoggedEmail) {
+        return false;
+      }
+
+      lastLoggedEmail = email;
+      console.log(`[google-account] Logged in email: ${email}`);
+      return true;
+    } catch (error) {
+      console.error('[google-account] Failed to read email from page', error);
+      return false;
+    }
+  };
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    const timerId = setInterval(() => {
+      attempts += 1;
+      void logGoogleEmail().then((found) => {
+        if (found || attempts >= maxAttempts) {
+          clearInterval(timerId);
+        }
+      });
+    }, 2000);
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     mainWindow.loadURL(url);
