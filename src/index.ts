@@ -15,6 +15,9 @@ const GOOGLE_ACCOUNT_URL = 'https://myaccount.google.com/';
 const buildCalendarUrl = (email: string): string =>
   `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(email)}&ctz=Asia%2FTokyo&showPrint=0&mode=WEEK`;
 
+const isCalendarEventsUrl = (url: string): boolean =>
+  /^https:\/\/[^/]*\.google\.com\/calendar\/v3\/calendars\/[^/?]+\/events\?/.test(url);
+
 const EMAIL_EXTRACTION_SCRIPT = `(() => {
   const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
   const pickEmail = (value) => {
@@ -65,6 +68,69 @@ const createWindow = (): void => {
   mainWindow.loadURL(GOOGLE_ACCOUNT_URL);
 
   let lastLoggedEmail: string | null = null;
+  const requestUrlById = new Map<string, string>();
+
+  const setupNetworkResponseLogging = (): void => {
+    try {
+      if (!mainWindow.webContents.debugger.isAttached()) {
+        mainWindow.webContents.debugger.attach('1.3');
+      }
+
+      void mainWindow.webContents.debugger.sendCommand('Network.enable');
+
+      mainWindow.webContents.debugger.on('message', (_event, method, params) => {
+        if (method === 'Network.responseReceived') {
+          const responseUrl = (params as { response?: { url?: string }; requestId?: string }).response?.url;
+          const requestId = (params as { requestId?: string }).requestId;
+
+          if (responseUrl && requestId && isCalendarEventsUrl(responseUrl)) {
+            requestUrlById.set(requestId, responseUrl);
+          }
+          return;
+        }
+
+        if (method === 'Network.loadingFailed') {
+          const requestId = (params as { requestId?: string }).requestId;
+          if (requestId) {
+            requestUrlById.delete(requestId);
+          }
+          return;
+        }
+
+        if (method === 'Network.loadingFinished') {
+          const requestId = (params as { requestId?: string }).requestId;
+          if (!requestId || !requestUrlById.has(requestId)) {
+            return;
+          }
+
+          const requestUrl = requestUrlById.get(requestId) ?? '';
+          requestUrlById.delete(requestId);
+
+          void mainWindow.webContents.debugger
+            .sendCommand('Network.getResponseBody', { requestId })
+            .then((result: { body?: string; base64Encoded?: boolean }) => {
+              const rawBody = result.body ?? '';
+              const body = result.base64Encoded ? Buffer.from(rawBody, 'base64').toString('utf8') : rawBody;
+              console.log(`[calendar-events] response url: ${requestUrl}`);
+              console.log(`[calendar-events] response body: ${body}`);
+            })
+            .catch((error) => {
+              console.error('[calendar-events] Failed to read response body', error);
+            });
+        }
+      });
+
+      mainWindow.on('closed', () => {
+        if (mainWindow.webContents.debugger.isAttached()) {
+          mainWindow.webContents.debugger.detach();
+        }
+      });
+    } catch (error) {
+      console.error('[calendar-events] Failed to attach debugger', error);
+    }
+  };
+
+  setupNetworkResponseLogging();
 
   const logGoogleEmail = async (): Promise<boolean> => {
     if (!mainWindow.webContents.getURL().startsWith(GOOGLE_ACCOUNT_URL)) {
