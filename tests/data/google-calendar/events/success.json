@@ -1,0 +1,100 @@
+{
+  "kind": "calendar#events",
+  "etag": "\"masked-etag\"",
+  "summary": "masked-user@example.com",
+  "description": "",
+  "updated": "2026-02-21T06:28:20.779Z",
+  "timeZone": "Asia/Tokyo",
+  "accessRole": "owner",
+  "defaultReminders": [
+    {
+      "method": "popup",
+      "minutes": 30
+    }
+  ],
+  "nextSyncToken": "masked-next-sync-token",
+  "items": [
+    {
+      "kind": "calendar#event",
+      "etag": "\"masked-event-etag-1\"",
+      "id": "masked-event-id-1",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=masked-eid-1&ctz=Asia/Tokyo",
+      "created": "2026-02-21T06:28:14.000Z",
+      "updated": "2026-02-21T06:28:14.967Z",
+      "summary": "test1",
+      "creator": {
+        "email": "masked-user@example.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "masked-user@example.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-02-21T15:30:00+09:00",
+        "timeZone": "Asia/Tokyo"
+      },
+      "end": {
+        "dateTime": "2026-02-21T16:30:00+09:00",
+        "timeZone": "Asia/Tokyo"
+      },
+      "iCalUID": "masked-icaluid-1@google.com",
+      "sequence": 0,
+      "hangoutLink": "https://meet.google.com/masked-meet-code-1",
+      "conferenceData": {
+        "entryPoints": [
+          {
+            "entryPointType": "video",
+            "uri": "https://meet.google.com/masked-meet-code-1",
+            "label": "meet.google.com/masked-meet-code-1"
+          }
+        ],
+        "conferenceSolution": {
+          "key": {
+            "type": "hangoutsMeet"
+          },
+          "name": "Google Meet",
+          "iconUri": "https://fonts.gstatic.com/s/i/productlogos/meet_2020q4/v6/web-512dp/logo_meet_2020q4_color_2x_web_512dp.png"
+        },
+        "conferenceId": "masked-conference-id-1"
+      },
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    },
+    {
+      "kind": "calendar#event",
+      "etag": "\"masked-event-etag-2\"",
+      "id": "masked-event-id-2",
+      "status": "confirmed",
+      "htmlLink": "https://www.google.com/calendar/event?eid=masked-eid-2&ctz=Asia/Tokyo",
+      "created": "2026-02-21T06:28:20.000Z",
+      "updated": "2026-02-21T06:28:20.182Z",
+      "summary": "test3",
+      "creator": {
+        "email": "masked-user@example.com",
+        "self": true
+      },
+      "organizer": {
+        "email": "masked-user@example.com",
+        "self": true
+      },
+      "start": {
+        "dateTime": "2026-02-21T11:30:00+09:00",
+        "timeZone": "Asia/Tokyo"
+      },
+      "end": {
+        "dateTime": "2026-02-21T12:30:00+09:00",
+        "timeZone": "Asia/Tokyo"
+      },
+      "iCalUID": "masked-icaluid-2@google.com",
+      "sequence": 0,
+      "reminders": {
+        "useDefault": true
+      },
+      "eventType": "default"
+    }
+  ]
+}
