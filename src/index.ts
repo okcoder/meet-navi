@@ -23,6 +23,11 @@ const createWindow = (): void => {
   // and load the requested page.
   mainWindow.loadURL('https://myaccount.google.com/');
 
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    mainWindow.loadURL(url);
+    return { action: 'deny' };
+  });
+
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
 };
