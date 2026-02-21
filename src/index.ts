@@ -12,6 +12,9 @@ if (require('electron-squirrel-startup')) {
 
 const GOOGLE_ACCOUNT_URL = 'https://myaccount.google.com/';
 
+const buildCalendarUrl = (email: string): string =>
+  `https://calendar.google.com/calendar/embed?src=${encodeURIComponent(email)}&ctz=Asia%2FTokyo&showPrint=0&mode=WEEK`;
+
 const EMAIL_EXTRACTION_SCRIPT = `(() => {
   const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
   const pickEmail = (value) => {
@@ -76,6 +79,7 @@ const createWindow = (): void => {
 
       lastLoggedEmail = email;
       console.log(`[google-account] Logged in email: ${email}`);
+      mainWindow.loadURL(buildCalendarUrl(email));
       return true;
     } catch (error) {
       console.error('[google-account] Failed to read email from page', error);
