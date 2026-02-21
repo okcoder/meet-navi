@@ -68,7 +68,10 @@ const createWindow = (): void => {
   mainWindow.loadURL(GOOGLE_ACCOUNT_URL);
 
   let lastLoggedEmail: string | null = null;
+  let emailCheckTimer: NodeJS.Timeout | null = null;
   const requestUrlById = new Map<string, string>();
+  let isClosing = false;
+  const isWindowUsable = (): boolean => !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed();
 
   const setupNetworkResponseLogging = (): void => {
     try {
@@ -76,9 +79,15 @@ const createWindow = (): void => {
         mainWindow.webContents.debugger.attach('1.3');
       }
 
-      void mainWindow.webContents.debugger.sendCommand('Network.enable');
+      void mainWindow.webContents.debugger.sendCommand('Network.enable').catch((error) => {
+        console.error('[calendar-events] Failed to enable network logging', error);
+      });
 
       mainWindow.webContents.debugger.on('message', (_event, method, params) => {
+        if (isClosing || !isWindowUsable()) {
+          return;
+        }
+
         if (method === 'Network.responseReceived') {
           const responseUrl = (params as { response?: { url?: string }; requestId?: string }).response?.url;
           const requestId = (params as { requestId?: string }).requestId;
@@ -120,10 +129,30 @@ const createWindow = (): void => {
         }
       });
 
-      mainWindow.on('closed', () => {
-        if (mainWindow.webContents.debugger.isAttached()) {
-          mainWindow.webContents.debugger.detach();
+      mainWindow.on('close', () => {
+        isClosing = true;
+        if (emailCheckTimer) {
+          clearInterval(emailCheckTimer);
+          emailCheckTimer = null;
         }
+
+        try {
+          if (!mainWindow.webContents.isDestroyed() && mainWindow.webContents.debugger.isAttached()) {
+            mainWindow.webContents.debugger.detach();
+          }
+        } catch {
+          // Ignore close-time detach errors.
+        }
+      });
+
+      mainWindow.on('closed', () => {
+        isClosing = true;
+        if (emailCheckTimer) {
+          clearInterval(emailCheckTimer);
+          emailCheckTimer = null;
+        }
+
+        requestUrlById.clear();
       });
     } catch (error) {
       console.error('[calendar-events] Failed to attach debugger', error);
@@ -133,11 +162,16 @@ const createWindow = (): void => {
   setupNetworkResponseLogging();
 
   const logGoogleEmail = async (): Promise<boolean> => {
-    if (!mainWindow.webContents.getURL().startsWith(GOOGLE_ACCOUNT_URL)) {
+    if (isClosing || !isWindowUsable()) {
       return false;
     }
 
     try {
+      const currentUrl = mainWindow.webContents.getURL();
+      if (!currentUrl.startsWith(GOOGLE_ACCOUNT_URL)) {
+        return false;
+      }
+
       const email = (await mainWindow.webContents.executeJavaScript(EMAIL_EXTRACTION_SCRIPT, true)) as string | null;
       if (!email || email === lastLoggedEmail) {
         return false;
@@ -145,7 +179,9 @@ const createWindow = (): void => {
 
       lastLoggedEmail = email;
       console.log(`[google-account] Logged in email: ${email}`);
-      mainWindow.loadURL(buildCalendarUrl(email));
+      if (!isClosing && isWindowUsable()) {
+        mainWindow.loadURL(buildCalendarUrl(email));
+      }
       return true;
     } catch (error) {
       console.error('[google-account] Failed to read email from page', error);
@@ -154,14 +190,34 @@ const createWindow = (): void => {
   };
 
   mainWindow.webContents.on('did-finish-load', () => {
+    if (isClosing || !isWindowUsable()) {
+      return;
+    }
+
     let attempts = 0;
     const maxAttempts = 15;
 
-    const timerId = setInterval(() => {
+    if (emailCheckTimer) {
+      clearInterval(emailCheckTimer);
+      emailCheckTimer = null;
+    }
+
+    emailCheckTimer = setInterval(() => {
+      if (isClosing || !isWindowUsable()) {
+        if (emailCheckTimer) {
+          clearInterval(emailCheckTimer);
+          emailCheckTimer = null;
+        }
+        return;
+      }
+
       attempts += 1;
       void logGoogleEmail().then((found) => {
         if (found || attempts >= maxAttempts) {
-          clearInterval(timerId);
+          if (emailCheckTimer) {
+            clearInterval(emailCheckTimer);
+            emailCheckTimer = null;
+          }
         }
       });
     }, 2000);
