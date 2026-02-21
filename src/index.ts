@@ -20,8 +20,8 @@ const createWindow = (): void => {
     },
   });
 
-  // and load the index.html of the app.
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  // and load the requested page.
+  mainWindow.loadURL('https://myaccount.google.com/');
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
